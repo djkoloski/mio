@@ -31,7 +31,14 @@ include       = [
 # For documentation of features see the `mio::features` module.
 [features]
 # By default Mio only provides a shell implementation.
-default = ["log"]
+# default = ["log"]
+# TODO: Remove before submitting
+default = [
+  "log",
+  "net",
+  "os-ext",
+  "os-poll",
+]
 
 # Enables the `Poll` and `Registry` types.
 os-poll = []
@@ -49,6 +56,9 @@ log = { version = "0.4.8", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.149"
+
+[target.'cfg(target_os = "fuchsia")'.dependencies]
+fuchsia-zircon-sys = "0.4.0-alpha.2"
 
 [target.'cfg(target_os = "hermit")'.dependencies]
 libc = { package = "hermit-abi", version = "0.3.9" }

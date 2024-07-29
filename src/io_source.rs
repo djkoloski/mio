@@ -1,7 +1,9 @@
 use std::ops::{Deref, DerefMut};
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::AsRawFd;
-#[cfg(unix)]
+#[cfg(target_os = "fuchsia")]
+use std::os::fuchsia::zircon::AsRawHandle;
+#[cfg(all(unix, not(target_os = "fuchsia")))]
 use std::os::unix::io::AsRawFd;
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::AsRawFd;
@@ -104,7 +106,7 @@ impl<T> DerefMut for IoSource<T> {
     }
 }
 
-#[cfg(any(unix, target_os = "hermit"))]
+#[cfg(all(any(unix, target_os = "hermit"), not(target_os = "fuchsia")))]
 impl<T> event::Source for IoSource<T>
 where
     T: AsRawFd,
@@ -210,6 +212,42 @@ where
         #[cfg(debug_assertions)]
         self.selector_id.remove_association(registry)?;
         registry.selector().deregister(self.inner.as_raw_fd() as _)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl<T> event::Source for IoSource<T>
+where
+    T: AsRawHandle,
+{
+    fn register(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.associate(registry)?;
+        self.state
+            .register(registry, token, interests, self.inner.as_raw_handle())
+    }
+
+    fn reregister(
+        &mut self,
+        registry: &Registry,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.check_association(registry)?;
+        self.state
+            .reregister(registry, token, interests, self.inner.as_raw_handle())
+    }
+
+    fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
+        #[cfg(debug_assertions)]
+        self.selector_id.remove_association(registry)?;
+        self.state.deregister(registry, self.inner.as_raw_handle())
     }
 }
 

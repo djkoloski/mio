@@ -10,7 +10,7 @@
             target_os = "watchos",
         )
     )),
-    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit")),
+    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit", target_os = "fuchsia")),
 ))]
 mod fdbased {
     #[cfg(all(
@@ -63,7 +63,7 @@ mod fdbased {
             target_os = "watchos",
         )
     )),
-    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit")),
+    not(any(target_os = "solaris", target_os = "vita", target_os = "hermit", target_os = "fuchsia")),
 ))]
 pub use self::fdbased::Waker;
 
@@ -352,3 +352,60 @@ mod poll {
     target_os = "hermit"
 ))]
 pub use self::poll::Waker;
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use std::io;
+
+    use fuchsia_zircon_sys::{zx_handle_t, zx_packet_signal_t, zx_port_packet_t, zx_port_queue, ZX_OBJECT_READABLE, ZX_OK, zx_packet_type_t::ZX_PKT_TYPE_USER};
+
+    use crate::{sys::Selector, Token};
+
+    #[derive(Debug)]
+    pub struct Waker {
+        port: zx_handle_t,
+        key: u64,
+    }
+    
+    impl Waker {
+        pub fn new(selector: &Selector, token: Token) -> io::Result<Self> {
+            Ok(Self {
+                port: selector.port,
+                key: token.0 as u64,
+            })
+        }
+    
+        pub fn wake(&self) -> io::Result<()> {
+            #[repr(C)]
+            union Payload {
+                signal: zx_packet_signal_t,
+                union: [u8; 32],
+            }
+    
+            let mut payload = Payload { union: [0; 32] };
+            payload.signal.trigger = ZX_OBJECT_READABLE;
+            payload.signal.observed = ZX_OBJECT_READABLE;
+            payload.signal.count = 1;
+    
+            let packet = zx_port_packet_t {
+                key: self.key,
+                packet_type: ZX_PKT_TYPE_USER,
+                status: ZX_OK,
+                union: unsafe { payload.union },
+            };
+
+            let result = unsafe {
+                zx_port_queue(self.port, &packet as *const zx_port_packet_t)
+            };
+
+            if result == ZX_OK {
+                Ok(())
+            } else {
+                Err(io::Error::from_raw_os_error(result))
+            }
+        }
+    }    
+}
+
+#[cfg(target_os = "fuchsia")]
+pub use self::fuchsia::Waker;

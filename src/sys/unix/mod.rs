@@ -17,9 +17,13 @@ cfg_os_poll! {
     mod selector;
     pub(crate) use self::selector::{event, Event, Events, Selector};
 
+    #[cfg(not(target_os = "fuchsia"))]
     mod sourcefd;
-    #[cfg(feature = "os-ext")]
+    #[cfg(all(not(target_os = "fuchsia"), feature = "os-ext"))]
     pub use self::sourcefd::SourceFd;
+
+    #[cfg(target_os = "fuchsia")]
+    mod fuchsia;
 
     mod waker;
     pub(crate) use self::waker::Waker;
@@ -37,7 +41,7 @@ cfg_os_poll! {
 
     cfg_io_source! {
         // Both `kqueue` and `epoll` don't need to hold any user space state.
-        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris", target_os = "vita")))]
+        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris", target_os = "vita", target_os = "fuchsia")))]
         mod stateless_io_source {
             use std::io;
             #[cfg(target_os = "hermit")]
@@ -93,10 +97,10 @@ cfg_os_poll! {
             }
         }
 
-        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris",target_os = "vita")))]
+        #[cfg(not(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris",target_os = "vita", target_os = "fuchsia")))]
         pub(crate) use self::stateless_io_source::IoSourceState;
 
-        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris", target_os = "vita"))]
+        #[cfg(any(mio_unsupported_force_poll_poll, target_os = "hermit", target_os = "solaris", target_os = "vita", target_os = "fuchsia"))]
         pub(crate) use self::selector::IoSourceState;
     }
 
@@ -124,8 +128,14 @@ cfg_not_os_poll! {
     }
 
     cfg_any_os_ext! {
+        #[cfg(not(target_os = "fuchsia"))]
         mod sourcefd;
-        #[cfg(feature = "os-ext")]
+        #[cfg(all(not(target_os = "fuchsia"), feature = "os-ext"))]
         pub use self::sourcefd::SourceFd;
+
+        #[cfg(target_os = "fuchsia")]
+        mod fuchsia;
+        #[cfg(all(target_os = "fuchsia", feature = "os-ext"))]
+        pub use self::fuchsia::{RawHandle, SourceHandle};
     }
 }

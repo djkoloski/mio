@@ -10,6 +10,8 @@
 #![cfg_attr(test, deny(warnings))]
 // Disallow warnings in examples.
 #![doc(test(attr(deny(warnings))))]
+// Targeting Fuchsia requires nightly
+#![cfg_attr(target_os = "fuchsia", feature(fuchsia_zircon))]
 
 //! Mio is a fast, low-level I/O library for Rust focusing on non-blocking APIs
 //! and event notification for building high performance I/O apps with as little
@@ -82,7 +84,11 @@ pub mod unix {
         pub use crate::sys::pipe::{new, Receiver, Sender};
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
     pub use crate::sys::SourceFd;
+
+    #[cfg(target_os = "fuchsia")]
+    pub use crate::sys::SourceHandle;
 }
 
 #[cfg(all(target_os = "hermit", feature = "os-ext"))]

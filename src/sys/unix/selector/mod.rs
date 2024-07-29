@@ -20,6 +20,12 @@ mod epoll;
 ))]
 pub(crate) use self::epoll::{event, Event, Events, Selector};
 
+#[cfg(target_os = "fuchsia")]
+mod fuchsia;
+
+#[cfg(target_os = "fuchsia")]
+pub(crate) use self::fuchsia::{event, Event, Events, Selector, IoSourceState};
+
 #[cfg(any(
     mio_unsupported_force_poll_poll,
     target_os = "solaris",
@@ -79,4 +85,5 @@ pub(crate) use self::kqueue::{event, Event, Events, Selector};
 /// blindly assume this to be true, which means using any one of those a select
 /// could result in some interesting and unexpected errors. Avoid that by using
 /// an fd that doesn't have a pre-determined usage.
+#[cfg(not(target_os = "fuchsia"))]
 const LOWEST_FD: libc::c_int = 3;
